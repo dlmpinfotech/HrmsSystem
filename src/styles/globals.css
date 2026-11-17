@@ -1,0 +1,199 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Design tokens. Every colour in the UI resolves to one of these variables, so
+ * light/dark mode and per-company branding are just different variable values
+ * (see shared/branding.ts → brandingToCssVars).
+ */
+@layer base {
+  /* `.light` lets a subtree (e.g. the branding preview) force the light palette inside a dark page. */
+  :root,
+  .light {
+    --background: 210 40% 98%;
+    --foreground: 222 47% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 243 75% 59%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 214 32% 93%;
+    --secondary-foreground: 222 47% 11%;
+    --muted: 214 32% 95%;
+    --muted-foreground: 215 16% 38%;
+    --accent: 243 80% 96%;
+    --accent-foreground: 243 60% 30%;
+    --destructive: 0 72% 46%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 214 28% 88%;
+    --input: 214 28% 80%;
+    --ring: 243 75% 59%;
+    --sidebar: 222 47% 11%;
+    --sidebar-foreground: 210 40% 96%;
+    --button: 243 75% 59%;
+    --button-foreground: 0 0% 100%;
+    --brand-secondary: 199 89% 48%;
+    --brand-accent: 38 92% 50%;
+    --success: 152 60% 32%;
+    --warning: 28 90% 40%;
+    --radius: 12px;
+    --btn-radius: 10px;
+    --font-sans: 'Inter', 'Noto Sans Tamil', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --page-pad: 1.5rem;
+    --row-pad: 0.75rem;
+  }
+
+  .dark {
+    --background: 224 40% 6%;
+    --foreground: 210 40% 96%;
+    --card: 224 36% 10%;
+    --card-foreground: 210 40% 96%;
+    --popover: 224 36% 11%;
+    --popover-foreground: 210 40% 96%;
+    --primary: 243 90% 70%;
+    --primary-foreground: 224 40% 6%;
+    --secondary: 223 30% 16%;
+    --secondary-foreground: 210 40% 96%;
+    --muted: 223 30% 14%;
+    --muted-foreground: 215 20% 70%;
+    --accent: 243 40% 20%;
+    --accent-foreground: 243 90% 90%;
+    --destructive: 0 80% 62%;
+    --destructive-foreground: 224 40% 6%;
+    --border: 223 25% 20%;
+    --input: 223 25% 28%;
+    --ring: 243 90% 70%;
+    --sidebar: 224 40% 8%;
+    --sidebar-foreground: 210 40% 96%;
+    --button: 243 90% 70%;
+    --button-foreground: 224 40% 6%;
+    --success: 152 55% 55%;
+    --warning: 38 92% 60%;
+  }
+
+  [data-density='compact'] {
+    --page-pad: 1rem;
+    --row-pad: 0.45rem;
+    font-size: 14px;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-background font-sans text-foreground antialiased;
+    min-height: 100dvh;
+    overflow-x: hidden;
+  }
+
+  /* Tamil glyphs are taller; give them room so lines never clip. */
+  :lang(ta) body {
+    line-height: 1.7;
+  }
+  :lang(ta) h1,
+  :lang(ta) h2,
+  :lang(ta) h3 {
+    line-height: 1.45;
+    letter-spacing: 0;
+  }
+
+  :focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+
+  ::selection {
+    background: hsl(var(--primary) / 0.25);
+  }
+
+  /* Company "animations: off" preference and the OS reduced-motion setting. */
+  [data-motion='off'] *,
+  [data-motion='off'] *::before,
+  [data-motion='off'] *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer components {
+  .page {
+    padding: var(--page-pad);
+    @apply mx-auto w-full max-w-[1600px];
+  }
+  .section {
+    @apply py-16 sm:py-20 lg:py-24;
+  }
+  .eyebrow {
+    @apply text-xs font-semibold uppercase tracking-[0.14em] text-primary;
+  }
+  .h-display {
+    @apply text-balance text-4xl font-extrabold tracking-tight sm:text-5xl lg:text-6xl;
+  }
+  .h-section {
+    @apply text-balance text-3xl font-bold tracking-tight sm:text-4xl;
+  }
+  .lead {
+    @apply text-pretty text-base text-muted-foreground sm:text-lg;
+  }
+  .gradient-text {
+    background: linear-gradient(100deg, hsl(var(--primary)), hsl(var(--brand-secondary)));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .glass {
+    @apply border border-border/60 bg-card/75 backdrop-blur-xl;
+  }
+  .grid-bg {
+    background-image:
+      linear-gradient(hsl(var(--foreground) / 0.04) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(var(--foreground) / 0.04) 1px, transparent 1px);
+    background-size: 44px 44px;
+    mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black 30%, transparent 75%);
+  }
+  .skeleton {
+    @apply relative overflow-hidden rounded-md bg-muted;
+  }
+  .skeleton::after {
+    content: '';
+    @apply absolute inset-0 -translate-x-full animate-shimmer;
+    background: linear-gradient(90deg, transparent, hsl(var(--foreground) / 0.07), transparent);
+  }
+  .scroll-thin {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--border)) transparent;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  .text-pretty {
+    text-wrap: pretty;
+  }
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+  .safe-bottom {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+}
