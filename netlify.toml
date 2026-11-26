@@ -4,6 +4,11 @@
 
 [build.environment]
   NODE_VERSION = "22"
+  # Netlify fails a build when the value of a "secret" variable appears in the code or the built site.
+  # These are not secrets: VITE_* values are meant to be in the browser bundle (the Supabase anon key is
+  # public by design; RLS protects the data), and the rest are ordinary settings such as "smtp".
+  # Scanning stays on for real secrets (service role key, SMTP password, API keys). Never add those here.
+  SECRETS_SCAN_OMIT_KEYS = "VITE_BRAND_NAME,VITE_SITE_URL,VITE_SUPABASE_URL,VITE_SUPABASE_ANON_KEY,VITE_WHATSAPP_NUMBER,SUPABASE_URL,EMAIL_PROVIDER,SMTP_HOST,SMTP_PORT,AZURE_STORAGE_CONTAINER"
 
 [functions]
   directory = "netlify/functions"
