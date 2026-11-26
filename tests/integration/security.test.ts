@@ -102,13 +102,21 @@ describe('tenant isolation, roles and business rules (database)', () => {
   });
 
   it('keeps anonymous visitors out of all private tables', async () => {
-    for (const table of ['leads', 'companies', 'subscriptions', 'profiles', 'notification_logs', 'audit_logs']) {
+    for (const table of ['leads', 'companies', 'subscriptions', 'profiles', 'notification_logs', 'audit_logs', 'employees', 'leave_requests', 'comp_off_credits', 'payslips', 'salary_structures', 'payroll_runs', 'employee_documents', 'hr_tickets', 'hr_ticket_messages', 'hr_articles', 'company_assets', 'asset_assignments', 'approval_delegations', 'hr_settings']) {
       await expect(db.as('anon', null, `select * from ${table} limit 1`), table).rejects.toThrow(/permission denied/);
     }
     const plans = await db.as<{ key: string }>('anon', null, `select key from plans`);
     expect(plans.length).toBe(4);
     const settings = await db.as<{ key: string }>('anon', null, `select key from app_settings`);
     expect(settings.map((s) => s.key)).not.toContain('whatsapp_cloud');
+  });
+
+  it("hides another tenant's comp-off credits and blocks writing them", async () => {
+    const [emp] = await db.as<{ id: string }>('authenticated', acme.adminId, `insert into employees (company_id, employee_code, full_name) values ($1, 'SEC1', 'Sec Test') returning id`, [acme.companyId]);
+    await db.as('authenticated', acme.adminId, `insert into comp_off_credits (employee_id, work_date, status) values ($1, '2026-01-04', 'approved')`, [emp.id]);
+    expect(await db.as('authenticated', beta.adminId, `select 1 from comp_off_credits`)).toHaveLength(0);
+    expect(await db.as('authenticated', beta.adminId, `update comp_off_credits set status = 'cancelled' returning id`)).toHaveLength(0);
+    await expect(db.as('authenticated', beta.adminId, `insert into comp_off_credits (employee_id, work_date) values ($1, '2026-01-11')`, [emp.id])).rejects.toThrow(/row-level security|not_allowed/);
   });
 
   // ── CRM roles ───────────────────────────────────────────────────────

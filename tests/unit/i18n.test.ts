@@ -16,6 +16,16 @@ describe('localisation', () => {
     expect(LANGUAGE_STORAGE_KEY).toBe('hrms.lang');
   });
 
+  it('uses singular and plural forms', async () => {
+    await setLanguage('en', false);
+    expect(i18n.t('leave.daysCount', { count: 1 })).toBe('1 day');
+    expect(i18n.t('leave.daysCount', { count: 0.5 })).toBe('0.5 days');
+    expect(i18n.t('leave.daysCount', { count: 3 })).toBe('3 days');
+    await setLanguage('ta', false);
+    expect(i18n.t('leave.daysCount', { count: 1 })).toBe('1 நாள்');
+    await setLanguage('en', false);
+  });
+
   it('falls back to English for an unknown key in Tamil', async () => {
     await setLanguage('ta', false);
     expect(i18n.t('does.not.exist', { defaultValue: 'fallback' })).toBe('fallback');

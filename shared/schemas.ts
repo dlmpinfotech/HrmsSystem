@@ -321,10 +321,69 @@ export const employeeSchema = z
     status: z.enum(['active', 'inactive', 'exited']),
     login_access: z.boolean().default(false),
     login_role: z.enum(['employee', 'hr_manager']).default('employee'),
+    reporting_manager_id: z.union([z.literal(''), z.null(), z.undefined(), z.string().uuid()]).transform((v) => (v ? v : null)),
+    probation_end_date: optionalDate,
+    contract_end_date: optionalDate,
+    work_location: optionalText(80),
   })
-  .refine((v) => v.shift_end.slice(0, 5) > v.shift_start.slice(0, 5), { path: ['shift_end'], message: 'validation.shiftEnd' })
+  // An end time earlier than the start means the shift ends the next day (overnight).
+  .refine((v) => v.shift_end.slice(0, 5) !== v.shift_start.slice(0, 5), { path: ['shift_end'], message: 'validation.shiftEnd' })
   .refine((v) => !v.login_access || Boolean(v.email), { path: ['email'], message: 'validation.emailForAccess' });
 export type EmployeeInput = z.input<typeof employeeSchema>;
+
+const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'validation.date');
+const minutes = (max: number) => z.coerce.number().int('validation.number').min(0, 'validation.number').max(max, 'validation.number');
+
+/** A shift template. An end time earlier than the start = overnight. */
+export const shiftSchema = z
+  .object({
+    name: required(60).pipe(z.string().min(2, 'validation.min2')),
+    code: required(10).transform((v) => v.toUpperCase()),
+    start_time: timeHHMM,
+    end_time: timeHHMM,
+    break_minutes: minutes(240),
+    grace_minutes: minutes(120),
+    early_grace_minutes: minutes(120),
+    overtime_after_minutes: minutes(480),
+    color: z.enum(['primary', 'success', 'warning', 'info', 'danger', 'neutral']),
+    is_active: z.boolean().default(true),
+  })
+  .refine((v) => v.end_time.slice(0, 5) !== v.start_time.slice(0, 5), { path: ['end_time'], message: 'validation.shiftEnd' });
+export type ShiftInput = z.input<typeof shiftSchema>;
+
+/** Weekly rotation: week 1 uses shift_ids[0], week 2 shift_ids[1], … */
+export const rotationSchema = z.object({
+  name: required(60).pipe(z.string().min(2, 'validation.min2')),
+  shift_ids: z.array(z.string().uuid('validation.required')).min(1, 'validation.required').max(12),
+  anchor_date: isoDate,
+});
+export type RotationInput = z.input<typeof rotationSchema>;
+
+export const shiftAssignmentSchema = z
+  .object({
+    employee_ids: z.array(z.string().uuid()).min(1, 'validation.pickEmployees'),
+    kind: z.enum(['shift', 'rotation']),
+    target_id: z.string().uuid('validation.required'),
+    effective_from: isoDate,
+    effective_to: optionalDate,
+  })
+  .refine((v) => !v.effective_to || v.effective_to >= v.effective_from, { path: ['effective_to'], message: 'validation.endBeforeStart' });
+export type ShiftAssignmentInput = z.input<typeof shiftAssignmentSchema>;
+
+/** Employee asks HR to fix a day's attendance. */
+export const regularizationSchema = z
+  .object({
+    employee_id: z.string().uuid('validation.required'),
+    work_date: isoDate,
+    check_in_time: timeHHMM,
+    check_out_time: z.union([z.literal(''), z.null(), z.undefined(), timeHHMM]).transform((v) => (v ? v : null)),
+    out_next_day: z.boolean().default(false),
+    requested_status: z.enum(['present', 'half_day']),
+    work_mode: z.enum(['office', 'home', 'field']),
+    reason: z.string().trim().min(5, 'validation.reasonMin').max(500, 'validation.tooLong'),
+  })
+  .refine((v) => !v.check_out_time || v.out_next_day || v.check_out_time.slice(0, 5) > v.check_in_time.slice(0, 5), { path: ['check_out_time'], message: 'errors.out_before_in' });
+export type RegularizationInput = z.input<typeof regularizationSchema>;
 
 export const leaveRequestSchema = z
   .object({
@@ -334,10 +393,39 @@ export const leaveRequestSchema = z
     end_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'validation.date'),
     half_day: z.boolean().default(false),
     reason: optionalText(1000),
+    // Hourly permissions only (both or neither).
+    start_time: z.union([z.literal(''), z.null(), z.undefined(), timeHHMM]).transform((v) => (v ? v : undefined)),
+    end_time: z.union([z.literal(''), z.null(), z.undefined(), timeHHMM]).transform((v) => (v ? v : undefined)),
   })
   .refine((v) => v.end_date >= v.start_date, { path: ['end_date'], message: 'validation.endBeforeStart' })
-  .refine((v) => !v.half_day || v.start_date === v.end_date, { path: ['half_day'], message: 'validation.halfDayOneDay' });
+  .refine((v) => !v.half_day || v.start_date === v.end_date, { path: ['half_day'], message: 'validation.halfDayOneDay' })
+  .refine((v) => !v.start_time === !v.end_time, { path: ['end_time'], message: 'validation.required' })
+  .refine((v) => !v.start_time || !v.end_time || v.end_time > v.start_time, { path: ['end_time'], message: 'errors.out_before_in' });
 export type LeaveRequestInput = z.input<typeof leaveRequestSchema>;
+
+const blankToNull = (v: unknown) => (v === '' || v === null || v === undefined ? null : v);
+const optionalAmount = (max: number, min = 0) => z.preprocess(blankToNull, z.coerce.number({ invalid_type_error: 'validation.number' }).min(min, 'validation.number').max(max, 'validation.number').nullable());
+
+/** HR edits how a leave type is earned and approved. */
+export const leaveTypeRulesSchema = z.object({
+  annual_quota: optionalAmount(366),
+  accrual: z.enum(['annual', 'monthly']).default('annual'),
+  carry_forward_max: z.preprocess((v) => (v === '' || v === null || v === undefined ? 0 : v), z.coerce.number().min(0, 'validation.number').max(366, 'validation.number')),
+  max_hours_per_month: optionalAmount(200, 0.5),
+  approval_levels: z.coerce.number().int().min(1).max(2).transform((v) => v as 1 | 2),
+  is_paid: z.boolean().default(true),
+  encashable: z.boolean().default(false),
+  max_encash_days: optionalAmount(366, 0.5),
+});
+export type LeaveTypeRulesInput = z.input<typeof leaveTypeRulesSchema>;
+
+/** Employee asks for a comp-off credit for working on an off day / holiday. */
+export const compOffSchema = z.object({
+  work_date: isoDate,
+  days: z.coerce.number().refine((v) => v === 1 || v === 0.5, 'validation.required'),
+  reason: optionalText(500),
+});
+export type CompOffInput = z.input<typeof compOffSchema>;
 
 /** One person at a customer company: a contact, optionally with portal access. */
 export const companyPersonSchema = z
@@ -381,3 +469,62 @@ export const templateFormSchema = z.object({
   whatsapp_template_name: optionalText(120),
   is_active: z.boolean(),
 });
+
+/** HR emails finalized payslips — everyone in the run, or the selected employees. */
+export const payrollEmailSchema = z.object({
+  action: z.literal('email_payslips'),
+  run_id: z.string().uuid(),
+  employee_ids: z.array(z.string().uuid()).max(1000).optional(),
+});
+export type PayrollEmailInput = z.input<typeof payrollEmailSchema>;
+
+const money = (max = 10_000_000) => z.preprocess((v) => (v === '' || v === null || v === undefined ? 0 : v), z.coerce.number({ invalid_type_error: 'validation.number' }).min(0, 'validation.number').max(max, 'validation.number'));
+
+/** Monthly salary for one employee from a date (a new row each time pay changes). */
+export const salaryStructureSchema = z.object({
+  employee_id: z.string().uuid('validation.required'),
+  effective_from: isoDate,
+  basic: money().refine((v) => v > 0, 'validation.required'),
+  hra: money(),
+  conveyance: money(),
+  special_allowance: money(),
+  other_allowance: money(),
+  other_deduction: money(),
+  tds_monthly: money(),
+  pf_applicable: z.boolean().default(true),
+  esi_applicable: z.boolean().default(true),
+  pt_applicable: z.boolean().default(true),
+  note: optionalText(300),
+});
+export type SalaryStructureInput = z.input<typeof salaryStructureSchema>;
+
+const pct = (max: number) => z.coerce.number({ invalid_type_error: 'validation.number' }).min(0, 'validation.number').max(max, 'validation.number');
+
+/** Employee asks to cash out unused leave days. */
+export const encashSchema = z.object({
+  leave_type_id: z.string().uuid('validation.required'),
+  days: z.coerce.number({ invalid_type_error: 'validation.number' }).positive('validation.number').max(366, 'validation.number').refine((v) => Number.isInteger(v * 2), 'validation.halfDays'),
+  reason: optionalText(500),
+});
+export type EncashInput = z.input<typeof encashSchema>;
+
+export const payrollSettingsSchema = z.object({
+  pf_enabled: z.boolean(),
+  pf_employee_rate: pct(20),
+  pf_employer_rate: pct(20),
+  pf_wage_ceiling: z.coerce.number().positive('validation.number'),
+  pf_cap_at_ceiling: z.boolean(),
+  esi_enabled: z.boolean(),
+  esi_employee_rate: pct(10),
+  esi_employer_rate: pct(10),
+  esi_wage_limit: z.coerce.number().positive('validation.number'),
+  pt_enabled: z.boolean(),
+  pt_frequency: z.enum(['half_yearly', 'monthly']),
+  encash_basis: z.enum(['basic', 'gross']),
+  encash_divisor: z.coerce.number().refine((v) => v === 26 || v === 30, 'validation.number'),
+  pt_slabs: z
+    .array(z.object({ upto: z.preprocess((v) => (v === '' || v === null || v === undefined ? null : v), z.coerce.number().positive('validation.number').nullable()), tax: z.coerce.number().min(0, 'validation.number') }))
+    .min(1)
+    .max(12),
+});
+export type PayrollSettingsInput = z.input<typeof payrollSettingsSchema>;

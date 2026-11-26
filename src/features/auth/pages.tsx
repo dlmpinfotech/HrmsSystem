@@ -1,18 +1,18 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { motion } from 'motion/react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
-import { CheckCircle2, LockKeyhole, ShieldOff } from 'lucide-react';
+import { BadgeCheck, Building2, CheckCircle2, ChevronRight, LockKeyhole, ShieldCheck, ShieldOff, UserRound, Users, type LucideIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Logo, Seo } from '@/components/shared/brand';
+import { AnimatedLogoMark, Logo, Seo } from '@/components/shared/brand';
 import { TextField } from '@/components/shared/Field';
 import { FullPageLoader } from '@/components/shared/states';
 import { LanguageSwitcher, ThemeToggle } from '@/components/shared/widgets';
-import { useAuth } from '@/features/auth/AuthProvider';
+import { personaHome, useAuth, type PersonaKind } from '@/features/auth/AuthProvider';
 import { SocialLogin } from '@/features/auth/SocialLogin';
 import { isSupabaseConfigured } from '@/lib/env';
 import { sb } from '@/lib/supabase';
@@ -31,9 +31,10 @@ function AuthFrame({ title, subtitle, children }: { title: string; subtitle?: st
       </header>
       <main id="main" className="relative flex flex-1 items-center justify-center px-4 py-10">
         <motion.div initial={{ opacity: 0, y: 24, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }} className="w-full max-w-md">
-          <Card className="p-6 shadow-2xl sm:p-8">
-            <div className="mb-6 space-y-1.5 text-center">
-              <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
+          <Card className="border-border/70 bg-card/95 p-6 shadow-2xl backdrop-blur sm:p-8">
+            <div className="mb-6 flex flex-col items-center space-y-1.5 text-center">
+              <AnimatedLogoMark className="mb-3 size-12" />
+              <h1 className="text-2xl font-extrabold tracking-tight">{title}</h1>
               {subtitle && <p className="text-sm text-muted-foreground">{subtitle}</p>}
             </div>
             {!isSupabaseConfigured && <p role="alert" className="mb-4 rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm">{t('errors.notConfigured')}</p>}
@@ -115,12 +116,30 @@ export function ResetPasswordPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [params] = useSearchParams();
-  const { session, loading, homePath, refresh } = useAuth();
+  const { session, loading, homePath, refresh, mfaPending } = useAuth();
   const invite = params.get('invite') === '1';
+  const tokenHash = params.get('token_hash');
+  const otpType = params.get('type') === 'recovery' ? 'recovery' : 'invite';
+  const [verifying, setVerifying] = useState(Boolean(tokenHash));
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<z.input<typeof resetPasswordSchema>>({ resolver: zodResolver(resetPasswordSchema) });
 
+  // Invitation emails link to this site with a one-time token (never the database host).
+  const verifyStarted = useRef(false);
   useEffect(() => {
-    if (!loading && !session) {
+    if (!tokenHash || verifyStarted.current) return; // the token works once — never verify twice
+    verifyStarted.current = true;
+    void sb()
+      .auth.verifyOtp({ token_hash: tokenHash, type: otpType })
+      .then(async ({ error }) => {
+        window.history.replaceState(null, '', `${window.location.pathname}${invite ? '?invite=1' : ''}`);
+        if (error) toast.error(t('auth.linkExpired'));
+        else await refresh();
+        setVerifying(false);
+      });
+  }, [tokenHash, otpType, invite, refresh, t]);
+
+  useEffect(() => {
+    if (!loading && !session && !verifying && !tokenHash) {
       const timer = setTimeout(() => toast.error(t('auth.linkExpired')), 1500);
       return () => clearTimeout(timer);
     }
@@ -137,6 +156,7 @@ export function ResetPasswordPage() {
     navigate(homePath === '/login' ? '/login' : homePath, { replace: true });
   };
 
+  if (mfaPending && !verifying) return <Navigate to="/mfa" replace state={{ from: '/reset-password' }} />;
   return (
     <AuthFrame title={invite ? t('auth.inviteTitle') : t('auth.resetTitle')} subtitle={invite ? t('auth.inviteSubtitle') : t('auth.resetSubtitle')}>
       <Seo title={t('auth.resetTitle')} noindex />
@@ -162,6 +182,53 @@ export function NoAccessPage() {
         <p className="text-sm text-muted-foreground">{profile && !profile.is_active ? t('auth.disabled') : t('auth.noAccessBody')}</p>
         <Button variant="outline" onClick={() => void signOut().then(() => navigate('/login'))}>{t('auth.signOut')}</Button>
       </div>
+    </AuthFrame>
+  );
+}
+
+const PERSONA_ICON: Record<PersonaKind, LucideIcon> = { staff: ShieldCheck, admin: Building2, hr: Users, member: UserRound, employee: BadgeCheck };
+
+/** Shown after sign-in when one login has several account types (e.g. HR Manager and Employee). */
+export function ChooseAccountPage() {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const { loading, session, personas, persona, choosePersona, signOut, profile } = useAuth();
+  if (loading) return <FullPageLoader />;
+  if (!session) return <Navigate to="/login" replace />;
+  if (personas.length <= 1) return <Navigate to="/" replace />;
+  return (
+    <AuthFrame title={t('persona.title')} subtitle={t('persona.subtitle', { email: profile?.email ?? '' })}>
+      <ul className="space-y-2.5">
+        {personas.map((p) => {
+          const Icon = PERSONA_ICON[p.kind];
+          const current = persona?.key === p.key;
+          return (
+            <li key={p.key}>
+              <button
+                type="button"
+                onClick={() => {
+                  choosePersona(p.key);
+                  navigate(personaHome(p), { replace: true });
+                }}
+                className="group flex min-h-[4.25rem] w-full items-center gap-3 rounded-xl border bg-card p-3 text-left transition-all hover:border-primary/60 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.99] sm:gap-4 sm:p-4"
+              >
+                <span className="inline-flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><Icon className="size-5" aria-hidden /></span>
+                <span className="min-w-0 flex-1">
+                  <span className="block font-semibold leading-snug">{t(`persona.kind.${p.kind}`)}</span>
+                  <span className="block text-xs text-muted-foreground">
+                    {p.companyName ?? t('persona.platform')}
+                    {p.employeeCode ? ` · ${p.employeeCode}` : ''}
+                  </span>
+                  <span className="mt-0.5 block text-xs text-muted-foreground">{t(`persona.desc.${p.kind}`)}</span>
+                </span>
+                {current ? <CheckCircle2 className="size-5 shrink-0 text-primary" aria-label={t('persona.current')} /> : <ChevronRight className="size-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" aria-hidden />}
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+      <p className="mt-4 text-center text-xs text-muted-foreground">{t('persona.switchLater')}</p>
+      <Button variant="ghost" className="mt-2 w-full" onClick={() => void signOut().then(() => navigate('/login'))}>{t('auth.signOut')}</Button>
     </AuthFrame>
   );
 }

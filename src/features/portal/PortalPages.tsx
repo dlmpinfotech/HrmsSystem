@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { motion } from 'motion/react';
 import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router-dom';
-import { BookOpen, Building2, CalendarDays, Clock, CreditCard, ExternalLink, FlaskConical, Home, LifeBuoy, Palette, Receipt, Search, ShieldAlert, Sparkles, Users, Video } from 'lucide-react';
+import { BookOpen, Building2, CalendarClock, CalendarDays, LayoutDashboard, Clock, CreditCard, ExternalLink, FlaskConical, Home, LifeBuoy, Palette, Receipt, Search, ShieldAlert, Sparkles, Users, Video, Wallet, FolderOpen, Headset, Laptop, ChartColumn } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -75,25 +75,37 @@ export function PortalLayout() {
   const hrGroup = t('portal.nav.hrGroup');
   const hrNav: NavItem[] = isHr
     ? [
-        { to: '/portal/employees', label: t('portal.nav.employees'), icon: Users, group: hrGroup },
-        { to: '/portal/attendance', label: t('portal.nav.attendance'), icon: Clock },
-        { to: '/portal/leave', label: t('portal.nav.leave'), icon: CalendarDays },
+        { to: '/portal/hr', label: t('portal.nav.hrOverview'), icon: LayoutDashboard, group: hrGroup, mobile: true },
+        { to: '/portal/employees', label: t('portal.nav.employees'), icon: Users },
+        { to: '/portal/attendance', label: t('portal.nav.attendance'), icon: Clock, mobile: true },
+        { to: '/portal/shifts', label: t('portal.nav.shifts'), icon: CalendarClock },
+        { to: '/portal/leave', label: t('portal.nav.leave'), icon: CalendarDays, mobile: true },
+        { to: '/portal/payroll', label: t('portal.nav.payroll'), icon: Wallet },
+        { to: '/portal/helpdesk', label: t('portal.nav.helpdesk'), icon: Headset },
+        { to: '/portal/assets', label: t('portal.nav.assets'), icon: Laptop },
+        { to: '/portal/analytics', label: t('portal.nav.analytics'), icon: ChartColumn },
       ]
     : me.data
       ? [
-          { to: '/portal/attendance', label: t('portal.nav.attendance'), icon: Clock, group: hrGroup },
-          { to: '/portal/leave', label: t('portal.nav.leave'), icon: CalendarDays },
+          { to: '/portal/attendance', label: t('portal.nav.attendance'), icon: Clock, group: hrGroup, mobile: true },
+          { to: '/portal/leave', label: t('portal.nav.leave'), icon: CalendarDays, mobile: true },
+          { to: '/portal/payslips', label: t('portal.nav.payslips'), icon: Wallet },
+          { to: '/portal/documents', label: t('portal.nav.documents'), icon: FolderOpen },
+          { to: '/portal/helpdesk', label: t('portal.nav.helpdesk'), icon: Headset },
         ]
       : [];
   const nav: NavItem[] = isEmployeeOnly
     ? [
-        { to: '/portal/attendance', label: t('portal.nav.attendance'), icon: Clock },
-        { to: '/portal/leave', label: t('portal.nav.leave'), icon: CalendarDays },
+        { to: '/portal/attendance', label: t('portal.nav.attendance'), icon: Clock, mobile: true },
+        { to: '/portal/leave', label: t('portal.nav.leave'), icon: CalendarDays, mobile: true },
+        { to: '/portal/payslips', label: t('portal.nav.payslips'), icon: Wallet, mobile: true },
+        { to: '/portal/documents', label: t('portal.nav.documents'), icon: FolderOpen },
+        { to: '/portal/helpdesk', label: t('portal.nav.helpdesk'), icon: Headset },
         { to: '/portal/help', label: t('portal.nav.help'), icon: BookOpen, group: t('portal.nav.helpGroup') },
         { to: '/portal/videos', label: t('portal.nav.videos'), icon: Video },
       ]
     : [
-    { to: '/portal', label: t('portal.nav.dashboard'), icon: Home, end: true },
+    { to: '/portal', label: t('portal.nav.dashboard'), icon: Home, end: true, mobile: true },
     { to: '/portal/company', label: t('portal.nav.company'), icon: Building2 },
     ...(isCompanyAdmin ? [{ to: '/portal/branding', label: t('portal.nav.branding'), icon: Palette }] : []),
     { to: '/portal/subscription', label: t('portal.nav.subscription'), icon: CreditCard },

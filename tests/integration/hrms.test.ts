@@ -46,9 +46,22 @@ describe('HRMS: employees, attendance and leave (database)', () => {
     await db.close();
   });
 
+  it('moves the login link when HR corrects an employee email', async () => {
+    // A record typed with the HR person's own email links to the HR login…
+    const [e] = await db.as<{ id: string; user_id: string | null }>('authenticated', hrId, `insert into employees (company_id, employee_code, full_name, email) values ($1, 'MIX1', 'Joe', 'hr@acme.test') returning id, user_id`, [acme.companyId]);
+    expect(e.user_id).toBe(hrId);
+    // …and fixing the email releases it (no login exists for the new address yet).
+    const [fixed] = await db.as<{ user_id: string | null }>('authenticated', hrId, `update employees set email = 'joe@acme.test' where id = $1 returning user_id`, [e.id]);
+    expect(fixed.user_id).toBeNull();
+    // Unrelated edits keep the link.
+    const [kept] = await db.as<{ user_id: string | null }>('authenticated', hrId, `update employees set designation = 'Fitter' where id = $1 returning user_id`, [empId]);
+    expect(kept.user_id).toBe(empUserId);
+    await db.admin(`delete from employees where id = $1`, [e.id]);
+  });
+
   it('seeds default leave types for every company', async () => {
     const types = await db.admin<{ code: string }>(`select code from leave_types where company_id = $1 order by sort_order`, [acme.companyId]);
-    expect(types.map((t) => t.code)).toEqual(['CL', 'SL', 'EL', 'LOP']);
+    expect(types.map((t) => t.code)).toEqual(['CL', 'SL', 'EL', 'LOP', 'CO', 'PER']);
   });
 
   it('links an employee to the portal login with the same email', async () => {
@@ -148,7 +161,7 @@ describe('HRMS: employees, attendance and leave (database)', () => {
   it('stops employees approving their own leave or applying for colleagues', async () => {
     await expect(db.as('authenticated', empUserId, `insert into leave_requests (employee_id, leave_type_id, start_date, end_date, status) values ($1, $2, '2030-03-04', '2030-03-04', 'approved')`, [empId, await cl()])).rejects.toThrow(/new_requests_are_pending/);
     await expect(db.as('authenticated', empUserId, `update leave_requests set status = 'approved' where employee_id = $1`, [empId])).rejects.toThrow(/only_cancel_pending/);
-    await expect(db.as('authenticated', empUserId, `insert into leave_requests (employee_id, leave_type_id, start_date, end_date) values ($1, $2, '2030-03-04', '2030-03-04')`, [otherEmpId, await cl()])).rejects.toThrow(/row-level security/);
+    await expect(db.as('authenticated', empUserId, `insert into leave_requests (employee_id, leave_type_id, start_date, end_date) values ($1, $2, '2030-03-04', '2030-03-04')`, [otherEmpId, await cl()])).rejects.toThrow(/row-level security|not_allowed/);
   });
 
   it('lets HR approve with a record of who decided, and employees cancel pending requests', async () => {
@@ -161,7 +174,7 @@ describe('HRMS: employees, attendance and leave (database)', () => {
   });
 
   it('keeps leave types and holidays read-only for employees', async () => {
-    expect((await db.as('authenticated', empUserId, `select 1 from leave_types`)).length).toBe(4);
+    expect((await db.as('authenticated', empUserId, `select 1 from leave_types`)).length).toBe(6);
     await expect(db.as('authenticated', empUserId, `insert into holidays (company_id, holiday_date, name) values ($1, '2030-04-14', 'Tamil New Year')`, [acme.companyId])).rejects.toThrow(/row-level security/);
     expect(await db.as('authenticated', empUserId, `update leave_types set annual_quota = 99 returning id`)).toHaveLength(0);
   });

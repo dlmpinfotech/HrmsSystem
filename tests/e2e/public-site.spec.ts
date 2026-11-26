@@ -151,7 +151,7 @@ test.describe('forms (API mocked)', () => {
 
   test('free trial form enforces password rules', async ({ page }) => {
     await page.goto('/free-trial');
-    await page.getByLabel('Password').fill('short');
+    await page.locator('input[autocomplete="new-password"]').fill('short');
     await page.getByRole('button', { name: 'Create my account' }).click();
     await expect(page.getByText('Use at least 8 characters')).toBeVisible();
   });

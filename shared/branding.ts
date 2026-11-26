@@ -185,6 +185,7 @@ export function brandingToCssVars(branding: Branding, resolved: 'light' | 'dark'
     '--radius': `${appearance.radius}px`,
     '--btn-radius': appearance.buttonStyle === 'pill' ? '9999px' : appearance.buttonStyle === 'square' ? '2px' : `${Math.max(appearance.radius - 2, 0)}px`,
     '--font-sans': FONT_STACKS[appearance.font],
+    '--font-display': appearance.font === 'inter' ? `'Plus Jakarta Sans', ${FONT_STACKS.inter}` : FONT_STACKS[appearance.font],
   };
 
   if (theme_mode === 'custom') {

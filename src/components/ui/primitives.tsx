@@ -18,14 +18,39 @@ Label.displayName = 'Label';
 // ── Tabs ──────────────────────────────────────────────────────────────
 export const Tabs = TabsPrimitive.Root;
 
+/** One row of tabs with an animated underline; scrolls sideways on small screens and keeps the active tab in view. */
 export const TabsList = React.forwardRef<React.ElementRef<typeof TabsPrimitive.List>, React.ComponentPropsWithoutRef<typeof TabsPrimitive.List>>(
-  ({ className, ...props }, ref) => (
-    <TabsPrimitive.List
-      ref={ref}
-      className={cn('scroll-thin inline-flex max-w-full items-center gap-1 overflow-x-auto rounded-lg bg-muted p-1', className)}
-      {...props}
-    />
-  ),
+  ({ className, ...props }, ref) => {
+    const inner = React.useRef<HTMLDivElement | null>(null);
+    React.useEffect(() => {
+      const el = inner.current;
+      if (!el) return;
+      const reveal = () => {
+        const active = el.querySelector<HTMLElement>('[data-state="active"]');
+        if (!active) return;
+        const left = active.offsetLeft - el.clientWidth / 2 + active.clientWidth / 2;
+        el.scrollTo({ left: Math.max(left, 0), behavior: 'smooth' });
+      };
+      reveal();
+      const obs = new MutationObserver(reveal);
+      obs.observe(el, { subtree: true, attributes: true, attributeFilter: ['data-state'] });
+      return () => obs.disconnect();
+    }, []);
+    return (
+      <TabsPrimitive.List
+        ref={(node) => {
+          inner.current = node;
+          if (typeof ref === 'function') ref(node);
+          else if (ref) ref.current = node;
+        }}
+        className={cn(
+          'relative flex w-full items-end gap-1 overflow-x-auto border-b border-border [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
+          className,
+        )}
+        {...props}
+      />
+    );
+  },
 );
 TabsList.displayName = 'TabsList';
 
@@ -34,7 +59,8 @@ export const TabsTrigger = React.forwardRef<React.ElementRef<typeof TabsPrimitiv
     <TabsPrimitive.Trigger
       ref={ref}
       className={cn(
-        'inline-flex h-9 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-md px-3 text-sm font-medium text-muted-foreground transition-all data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm [&_svg]:size-4',
+        'relative inline-flex h-11 shrink-0 outline-none focus-visible:bg-muted/60 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring focus-visible:ring-offset-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-t-lg px-3.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground data-[state=active]:text-primary [&_svg]:size-4',
+        'after:absolute after:inset-x-2 after:-bottom-px after:h-[3px] after:origin-center after:scale-x-0 after:rounded-full after:bg-primary after:transition-transform after:duration-300 after:ease-out data-[state=active]:after:scale-x-100',
         className,
       )}
       {...props}

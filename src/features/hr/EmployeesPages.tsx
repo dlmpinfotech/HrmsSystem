@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input, Select } from '@/components/ui/input';
 import { DataTable, type Column } from '@/components/shared/DataTable';
+import { FilterBar } from '@/components/shared/FilterBar';
 import { CheckField, RadioGroupField, SelectField, TextField, TextareaField } from '@/components/shared/Field';
 import { EmptyState, ErrorState, ListSkeleton, QueryState } from '@/components/shared/states';
 import { PageHeader, StatusBadge } from '@/components/shared/widgets';
@@ -85,17 +86,33 @@ export function EmployeesPage() {
           </>
         }
       />
-      <div className="mb-4 flex flex-col gap-2 sm:flex-row">
-        <Input type="search" aria-label={t('common.search')} placeholder={t('hr.searchEmployees')} value={search} onChange={(e) => setSearch(e.target.value)} className="sm:max-w-xs" />
-        <Select aria-label={t('hr.department')} value={dept} onChange={(e) => setDept(e.target.value)} className="sm:w-48">
-          <option value="">{t('hr.allDepartments')}</option>
-          {departments.map((d) => <option key={d} value={d}>{d}</option>)}
-        </Select>
-        <Select aria-label={t('crm.status')} value={status} onChange={(e) => setStatus(e.target.value)} className="sm:w-40">
-          <option value="">{t('crm.allStatuses')}</option>
-          {(['active', 'inactive', 'exited'] as const).map((s) => <option key={s} value={s}>{t(`employeeStatus.${s}`)}</option>)}
-        </Select>
-      </div>
+      <FilterBar
+        className="mb-4"
+        search={<Input type="search" aria-label={t('common.search')} placeholder={t('hr.searchEmployees')} value={search} onChange={(e) => setSearch(e.target.value)} />}
+        activeCount={(dept ? 1 : 0) + (status !== 'active' ? 1 : 0)}
+        onReset={() => { setDept(''); setStatus('active'); }}
+        filters={[
+          {
+            label: t('hr.department'),
+            className: 'md:w-48',
+            control: (
+              <Select aria-label={t('hr.department')} value={dept} onChange={(e) => setDept(e.target.value)}>
+                <option value="">{t('hr.allDepartments')}</option>
+                {departments.map((d) => <option key={d} value={d}>{d}</option>)}
+              </Select>
+            ),
+          },
+          {
+            label: t('crm.status'),
+            control: (
+              <Select aria-label={t('crm.status')} value={status} onChange={(e) => setStatus(e.target.value)}>
+                <option value="">{t('crm.allStatuses')}</option>
+                {(['active', 'inactive', 'exited'] as const).map((s) => <option key={s} value={s}>{t(`employeeStatus.${s}`)}</option>)}
+              </Select>
+            ),
+          },
+        ]}
+      />
       <QueryState
         query={query}
         isEmpty={() => rows.length === 0}
@@ -135,15 +152,21 @@ function defaults(e: Employee | undefined): EmployeeInput {
     status: e?.status ?? 'active',
     login_access: false,
     login_role: 'employee',
+    reporting_manager_id: e?.reporting_manager_id ?? '',
+    probation_end_date: e?.probation_end_date ?? '',
+    contract_end_date: e?.contract_end_date ?? '',
+    work_location: e?.work_location ?? '',
   } as EmployeeInput;
 }
 
 function EmployeeForm({ employee }: { employee?: Employee }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { activeCompany, user } = useAuth();
+  const { activeCompany, user, isCompanyAdmin } = useAuth();
   const invalidate = useInvalidateHr();
-  const departments = useEmployees(activeCompany?.id).data?.map((e) => e.department).filter(Boolean) as string[] | undefined;
+  const allEmployees = useEmployees(activeCompany?.id).data;
+  const departments = allEmployees?.map((e) => e.department).filter(Boolean) as string[] | undefined;
+  const managers = (allEmployees ?? []).filter((e) => e.status === 'active' && e.id !== employee?.id);
   const { register, handleSubmit, watch, setError, formState: { errors, isSubmitting } } = useForm<EmployeeInput>({ resolver: zodResolver(employeeSchema) as never, defaultValues: defaults(employee) });
   const loginAccess = watch('login_access');
   const hasLogin = Boolean(employee?.user_id);
@@ -170,6 +193,10 @@ function EmployeeForm({ employee }: { employee?: Employee }) {
       grace_minutes: v.grace_minutes,
       weekly_offs: [...new Set(v.weekly_offs.map(Number))],
       status: v.status,
+      reporting_manager_id: v.reporting_manager_id,
+      probation_end_date: v.probation_end_date,
+      contract_end_date: v.contract_end_date,
+      work_location: v.work_location ?? null,
     };
     const res = employee
       ? await sb().from('employees').update(row).eq('id', employee.id).select('id').single()
@@ -184,8 +211,8 @@ function EmployeeForm({ employee }: { employee?: Employee }) {
 
     if (v.login_access && v.email && !hasLogin) {
       try {
-        const r = await api<{ invited?: boolean }>('/team', { method: 'POST', body: { action: 'invite', email: v.email, full_name: v.full_name, role_key: v.login_role, company_id: activeCompany!.id } });
-        toast.success(r.invited ? t('hr.savedInvited', { email: v.email }) : t('hr.savedLinked'));
+        const r = await api<{ invited?: boolean; emailed?: boolean }>('/team', { method: 'POST', body: { action: 'invite', email: v.email, full_name: v.full_name, role_key: v.login_role, company_id: activeCompany!.id } });
+        toast.success(r.invited ? t('hr.savedInvited', { email: v.email }) : r.emailed ? t('hr.savedLinkedEmailed', { email: v.email }) : t('hr.savedLinked'));
       } catch (err) {
         const reason = err instanceof ApiError ? t(`errors.${err.code}`, { defaultValue: err.message }) : t('errors.generic');
         toast.error(t('hr.savedInviteFailed', { reason }), { duration: 8000 });
@@ -194,7 +221,7 @@ function EmployeeForm({ employee }: { employee?: Employee }) {
       toast.success(employee ? t('common.saved') : t('hr.added'));
     }
     await invalidate();
-    navigate('/portal/employees');
+    navigate(employee ? `/portal/employees/${employee.id}` : '/portal/employees');
   };
 
   const section = 'grid gap-4 sm:grid-cols-2';
@@ -225,6 +252,13 @@ function EmployeeForm({ employee }: { employee?: Employee }) {
           <datalist id="hr-departments">{[...new Set(departments ?? [])].map((d) => <option key={d} value={d} />)}</datalist>
           <TextField label={t('contacts.designation')} placeholder={t('people.designationPlaceholder')} error={errors.designation?.message} {...register('designation')} />
           <TextField label={t('hr.joiningDate')} type="date" error={errors.date_of_joining?.message} {...register('date_of_joining')} />
+          <SelectField label={t('hr.reportingManager')} error={errors.reporting_manager_id?.message} {...register('reporting_manager_id')}>
+            <option value="">{t('hr.noManager')}</option>
+            {managers.map((m) => <option key={m.id} value={m.id}>{m.full_name} ({m.employee_code})</option>)}
+          </SelectField>
+          <TextField label={t('hr.workLocation')} placeholder={t('hr.workLocationPlaceholder')} error={errors.work_location?.message} {...register('work_location')} />
+          <TextField label={t('hr.probationEnd')} type="date" error={errors.probation_end_date?.message} {...register('probation_end_date')} />
+          <TextField label={t('hr.contractEnd')} type="date" hint={t('hr.contractEndHint')} error={errors.contract_end_date?.message} {...register('contract_end_date')} />
           <RadioGroupField label={t('hr.employmentType')} inputProps={register('employment_type')} options={EMPLOYMENT_TYPES.map((v) => ({ value: v, label: t(`hr.types.${v}`) }))} />
           {employee && (
             <RadioGroupField label={t('crm.status')} inputProps={register('status')} options={(['active', 'inactive', 'exited'] as const).map((v) => ({ value: v, label: t(`employeeStatus.${v}`), hint: t(`hr.statusHint.${v}`) }))} />
@@ -233,7 +267,7 @@ function EmployeeForm({ employee }: { employee?: Employee }) {
       </Card>
 
       <Card>
-        <CardHeader><CardTitle>{t('hr.shiftRules')}</CardTitle><p className="text-sm text-muted-foreground">{t('hr.shiftRulesHint')}</p></CardHeader>
+        <CardHeader><CardTitle>{t('hr.shiftRules')}</CardTitle><p className="text-sm text-muted-foreground">{t('hr.shiftRulesHint')} <Link to="/portal/shifts?tab=assignments" className="font-medium text-primary hover:underline">{t('hr.shiftRotationLink')}</Link></p></CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-3">
             <TextField label={t('hr.shiftStart')} type="time" error={errors.shift_start?.message} {...register('shift_start')} />
@@ -260,14 +294,14 @@ function EmployeeForm({ employee }: { employee?: Employee }) {
           <CardContent className="space-y-3">
             <CheckField label={t('hr.allowLogin')} {...register('login_access')} />
             {loginAccess && (
-              <RadioGroupField label={t('team.role')} inputProps={register('login_role')} options={(['employee', 'hr_manager'] as const).map((r) => ({ value: r, label: t(`role.${r}`), hint: t(`roleHint.${r}`) }))} />
+              <RadioGroupField label={t('team.role')} inputProps={register('login_role')} options={(isCompanyAdmin ? (['employee', 'hr_manager'] as const) : (['employee'] as const)).map((r) => ({ value: r, label: t(`role.${r}`), hint: t(`roleHint.${r}`) }))} />
             )}
           </CardContent>
         )}
       </Card>
 
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-        <Button variant="outline" asChild><Link to="/portal/employees">{t('common.cancel')}</Link></Button>
+        <Button variant="outline" asChild><Link to={employee ? `/portal/employees/${employee.id}` : '/portal/employees'}>{t('common.cancel')}</Link></Button>
         <Button type="submit" loading={isSubmitting}><Save />{loginAccess && !hasLogin ? t('people.saveAndInvite') : t('common.save')}</Button>
       </div>
     </form>
@@ -281,7 +315,7 @@ export function EmployeeFormPage() {
   const editing = Boolean(id);
   return (
     <div className="mx-auto max-w-4xl">
-      <Button variant="ghost" size="sm" asChild className="mb-3 -ml-2"><Link to="/portal/employees"><ArrowLeft />{t('hr.backToEmployees')}</Link></Button>
+      <Button variant="ghost" size="sm" asChild className="mb-3 -ml-2"><Link to={editing ? `/portal/employees/${id}` : '/portal/employees'}><ArrowLeft />{editing ? t('e360.backToProfile') : t('hr.backToEmployees')}</Link></Button>
       <PageHeader title={editing ? query.data?.full_name ?? t('hr.editEmployee') : t('hr.addEmployee')} description={editing ? query.data?.employee_code : t('hr.addEmployeeSubtitle')} />
       {editing && query.isPending && <ListSkeleton rows={6} />}
       {editing && query.isError && <ErrorState error={query.error} />}

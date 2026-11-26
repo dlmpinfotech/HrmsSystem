@@ -41,6 +41,7 @@
     --radius: 12px;
     --btn-radius: 10px;
     --font-sans: 'Inter', 'Noto Sans Tamil', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --font-display: 'Plus Jakarta Sans', var(--font-sans);
     --page-pad: 1.5rem;
     --row-pad: 0.75rem;
   }
@@ -86,12 +87,30 @@
   html {
     scroll-behavior: smooth;
     -webkit-text-size-adjust: 100%;
+    /* Density by screen: phones 14px, tablets 14.5px, laptops / desktops 15px base. */
+    font-size: 14px;
+  }
+  @media (min-width: 640px) {
+    html { font-size: 14.5px; }
+  }
+  @media (min-width: 1024px) {
+    html { font-size: 15px; }
   }
 
   body {
     @apply bg-background font-sans text-foreground antialiased;
     min-height: 100dvh;
     overflow-x: hidden;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+    text-rendering: optimizeLegibility;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
+    letter-spacing: -0.015em;
   }
 
   /* Tamil glyphs are taller; give them room so lines never clip. */
@@ -181,6 +200,32 @@
     scrollbar-width: thin;
     scrollbar-color: hsl(var(--border)) transparent;
   }
+  /* Signed-in app background: a quiet brand-tinted glow at the top. */
+  .app-canvas {
+    background:
+      radial-gradient(1200px 380px at 70% -120px, hsl(var(--primary) / 0.07), transparent 70%),
+      hsl(var(--background));
+  }
+  .card-interactive {
+    transition: transform 200ms ease, box-shadow 200ms ease, border-color 200ms ease;
+  }
+  .card-interactive:hover {
+    transform: translateY(-2px);
+    border-color: hsl(var(--primary) / 0.3);
+    box-shadow: 0 2px 4px hsl(var(--foreground) / 0.04), 0 18px 40px -20px hsl(var(--foreground) / 0.22);
+  }
+  .stagger > * {
+    animation: fade-up 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  @keyframes fade-up {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .stagger > *:nth-child(2) { animation-delay: 40ms; }
+  .stagger > *:nth-child(3) { animation-delay: 80ms; }
+  .stagger > *:nth-child(4) { animation-delay: 120ms; }
+  .stagger > *:nth-child(5) { animation-delay: 160ms; }
+  .stagger > *:nth-child(n + 6) { animation-delay: 200ms; }
 }
 
 @layer utilities {
@@ -196,4 +241,12 @@
   .safe-bottom {
     padding-bottom: max(1rem, env(safe-area-inset-bottom));
   }
+}
+
+/* Printing a payslip prints only the payslip, not the app around it. */
+@media print {
+  body * { visibility: hidden; }
+  .print-area, .print-area * { visibility: visible; }
+  .print-area { position: absolute; inset: 0 0 auto 0; box-shadow: none; border: 0; }
+  .print-area { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }

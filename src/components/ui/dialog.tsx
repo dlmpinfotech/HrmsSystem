@@ -20,7 +20,7 @@ Overlay.displayName = 'DialogOverlay';
 
 interface ContentProps extends React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> {
   /** modal = centred dialog (bottom sheet on phones); left/right = sliding drawer. */
-  side?: 'modal' | 'left' | 'right';
+  side?: 'modal' | 'left' | 'right' | 'bottom';
   size?: 'sm' | 'md' | 'lg' | 'xl';
   closeLabel?: string;
 }
@@ -42,12 +42,14 @@ export const DialogContent = React.forwardRef<React.ElementRef<typeof DialogPrim
               'sm:data-[state=closed]:fade-out-0 sm:data-[state=open]:fade-in-0 sm:data-[state=closed]:zoom-out-95 sm:data-[state=open]:zoom-in-95 sm:data-[state=closed]:slide-out-to-bottom-0 sm:data-[state=open]:slide-in-from-bottom-0',
               sizes[size],
             ),
+          side === 'bottom' && 'inset-x-0 bottom-0 max-h-[88dvh] rounded-t-3xl border-t data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom',
           side === 'left' && 'inset-y-0 left-0 w-[86vw] max-w-xs border-r data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left',
           side === 'right' && cn('inset-y-0 right-0 w-full border-l data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right', sizes[size]),
           className,
         )}
         {...props}
       >
+        {(side === 'bottom' || side === 'modal') && <span className={cn('mx-auto mt-2.5 h-1.5 w-10 shrink-0 rounded-full bg-muted-foreground/25', side === 'modal' && 'sm:hidden')} aria-hidden />}
         {children}
         <DialogPrimitive.Close
           className="absolute right-3 top-3 inline-flex size-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"

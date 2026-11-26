@@ -14,6 +14,7 @@ import { DialogBody, DialogFooter } from '@/components/ui/dialog';
 import { Input, Select } from '@/components/ui/input';
 import { Avatar, Switch } from '@/components/ui/primitives';
 import { DataTable, type Column } from '@/components/shared/DataTable';
+import { FilterBar } from '@/components/shared/FilterBar';
 import { SelectField, TextField, TextareaField } from '@/components/shared/Field';
 import { EmptyState, ErrorState, ListSkeleton, QueryState } from '@/components/shared/states';
 import { FormDialog, InfoRow, PageHeader, StatusBadge } from '@/components/shared/widgets';
@@ -67,14 +68,22 @@ export function TicketList({ companyId, basePath }: { companyId?: string; basePa
   ];
   return (
     <div className="space-y-3">
-      <div className="flex flex-col gap-2 sm:flex-row">
-        <Input type="search" aria-label={t('common.search')} placeholder={t('support.search')} value={search} onChange={(e) => setSearch(e.target.value)} className="sm:max-w-xs" />
-        <Select aria-label={t('crm.status')} value={status} onChange={(e) => setStatus(e.target.value)} className="sm:w-48">
-          <option value="open_all">{t('support.openTickets')}</option>
-          <option value="">{t('support.allTickets')}</option>
-          {TICKET_STATUSES.map((s) => <option key={s} value={s}>{t(`ticketStatus.${s}`)}</option>)}
-        </Select>
-      </div>
+      <FilterBar
+        search={<Input type="search" aria-label={t('common.search')} placeholder={t('support.search')} value={search} onChange={(e) => setSearch(e.target.value)} />}
+        activeCount={status !== 'open_all' ? 1 : 0}
+        onReset={() => setStatus('open_all')}
+        filters={[{
+          label: t('crm.status'),
+          className: 'md:w-48',
+          control: (
+            <Select aria-label={t('crm.status')} value={status} onChange={(e) => setStatus(e.target.value)}>
+              <option value="open_all">{t('support.openTickets')}</option>
+              <option value="">{t('support.allTickets')}</option>
+              {TICKET_STATUSES.map((s) => <option key={s} value={s}>{t(`ticketStatus.${s}`)}</option>)}
+            </Select>
+          ),
+        }]}
+      />
       <QueryState query={query} isEmpty={() => rows.length === 0} empty={<EmptyState icon={LifeBuoy} title={t('support.empty')} />}>
         {() => <DataTable caption={t('support.title')} columns={columns} rows={rows} rowKey={(tk) => tk.id} onRowClick={(tk) => navigate(`${basePath}/${tk.id}`)} />}
       </QueryState>

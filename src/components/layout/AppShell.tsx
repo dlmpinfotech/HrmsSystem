@@ -1,8 +1,9 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { motion } from 'motion/react';
 import { useTranslation } from 'react-i18next';
+import { useQueryClient } from '@tanstack/react-query';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { ChevronsLeft, ChevronsUpDown, LogOut, Menu, type LucideIcon } from 'lucide-react';
+import { Check, ChevronsLeft, ChevronsUpDown, Ellipsis, LogOut, Menu, type LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -10,7 +11,7 @@ import { Avatar, Tooltip } from '@/components/ui/primitives';
 import { LogoMark } from '@/components/shared/brand';
 import { LanguageSwitcher, ThemeToggle } from '@/components/shared/widgets';
 import { PageTransition } from '@/components/layout/PublicLayout';
-import { useAuth } from '@/features/auth/AuthProvider';
+import { personaHome, useAuth } from '@/features/auth/AuthProvider';
 import { useTheme } from '@/features/branding/ThemeProvider';
 import { cn, storage } from '@/lib/utils';
 
@@ -21,6 +22,8 @@ export interface NavItem {
   end?: boolean;
   /** Optional heading shown above this item (starts a new group). */
   group?: string;
+  /** Show in the phone bottom bar (up to four items). */
+  mobile?: boolean;
 }
 
 interface AppShellProps {
@@ -59,17 +62,21 @@ function SideNav({ nav, collapsed, onNavigate }: { nav: NavItem[]; collapsed?: b
             onClick={onNavigate}
             className={({ isActive }) =>
               cn(
-                'group relative flex min-h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors',
+                'group relative flex min-h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors duration-150',
                 collapsed && 'justify-center px-0',
-                isActive ? 'bg-sidebar-foreground/[0.12] text-sidebar-foreground' : 'text-sidebar-foreground/70 hover:bg-sidebar-foreground/[0.07] hover:text-sidebar-foreground',
+                isActive ? 'text-sidebar-foreground' : 'text-sidebar-foreground/65 hover:bg-sidebar-foreground/[0.06] hover:text-sidebar-foreground',
               )
             }
           >
             {({ isActive }) => (
               <>
-                {isActive && <motion.span layoutId="nav-active" className="absolute inset-y-2 left-0 w-1 rounded-r-full bg-[hsl(var(--brand-accent))]" transition={{ type: 'spring', stiffness: 500, damping: 40 }} />}
-                <item.icon className="size-[18px] shrink-0" aria-hidden />
-                {collapsed ? <span className="sr-only">{item.label}</span> : <span className="truncate">{item.label}</span>}
+                {isActive && (
+                  <motion.span layoutId="nav-active" className="absolute inset-0 rounded-lg bg-sidebar-foreground/[0.11] shadow-[inset_0_0_0_1px_hsl(var(--sidebar-foreground)/0.06)]" transition={{ type: 'spring', stiffness: 500, damping: 40 }}>
+                    <span className="absolute inset-y-2 left-0 w-[3px] rounded-r-full bg-[hsl(var(--brand-accent))]" />
+                  </motion.span>
+                )}
+                <item.icon className={cn('relative size-[18px] shrink-0 transition-transform duration-200 group-hover:scale-110', isActive && 'text-[hsl(var(--brand-accent))]')} aria-hidden />
+                {collapsed ? <span className="sr-only">{item.label}</span> : <span className="relative truncate">{item.label}</span>}
               </>
             )}
           </NavLink>
@@ -86,11 +93,42 @@ function SideNav({ nav, collapsed, onNavigate }: { nav: NavItem[]; collapsed?: b
   );
 }
 
+/** Phone bottom bar: up to four key destinations plus "More" (opens the full menu). */
+function BottomNav({ nav, onMore }: { nav: NavItem[]; onMore: () => void }) {
+  const { t } = useTranslation();
+  const flagged = nav.filter((n) => n.mobile);
+  const items = (flagged.length >= 2 ? flagged : nav).slice(0, 4);
+  const cell = 'relative flex min-h-14 flex-1 flex-col items-center justify-center gap-0.5 px-1 text-[11px] font-medium leading-tight';
+  return (
+    <nav aria-label={t('nav.main')} className="fixed inset-x-0 bottom-0 z-40 border-t bg-card/90 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_24px_-16px_hsl(var(--foreground)/0.25)] backdrop-blur-xl lg:hidden">
+      <div className="mx-auto flex max-w-lg">
+        {items.map((item) => (
+          <NavLink key={item.to} to={item.to} end={item.end} className={({ isActive }) => cn(cell, isActive ? 'text-primary' : 'text-muted-foreground')}>
+            {({ isActive }) => (
+              <>
+                {isActive && <motion.span layoutId="bottom-active" className="absolute inset-x-3 top-1.5 h-8 rounded-full bg-primary/12" transition={{ type: 'spring', stiffness: 500, damping: 38 }} />}
+                <item.icon className="relative size-5" aria-hidden />
+                <span className="relative max-w-full truncate">{item.label}</span>
+              </>
+            )}
+          </NavLink>
+        ))}
+        <button type="button" onClick={onMore} className={cn(cell, 'text-muted-foreground')} aria-label={t('nav.openMenu')}>
+          <Ellipsis className="size-5" aria-hidden />
+          <span>{t('nav.more')}</span>
+        </button>
+      </div>
+    </nav>
+  );
+}
+
 function UserMenu() {
   const { t } = useTranslation();
-  const { profile, roles, activeMembership, memberships, activeCompany, setActiveCompany, signOut, isStaff } = useAuth();
+  const { profile, roles, activeMembership, signOut, isStaff, personas, persona, choosePersona } = useAuth();
   const navigate = useNavigate();
-  const roleLabel = isStaff ? roles.filter((r) => !r.startsWith('customer')).map((r) => t(`role.${r}`)).join(', ') : activeMembership ? t(`role.${activeMembership.role}`) : '';
+  const queryClient = useQueryClient();
+  const roleLabel = isStaff ? roles.filter((r) => !r.startsWith('customer')).map((r) => t(`role.${r}`)).join(', ') : persona ? t(`persona.kind.${persona.kind}`) : activeMembership ? t(`role.${activeMembership.role}`) : '';
+  const manyCompanies = new Set(personas.map((p) => p.companyId)).size > 1;
 
   return (
     <DropdownMenu>
@@ -106,18 +144,31 @@ function UserMenu() {
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-60">
         <DropdownMenuLabel className="truncate">{profile?.email}</DropdownMenuLabel>
-        {!isStaff && memberships.length > 1 && (
+        {personas.length > 1 && (
           <>
             <DropdownMenuSeparator />
-            <DropdownMenuLabel>{t('portal.switchCompany')}</DropdownMenuLabel>
-            {memberships.map((m) => (
-              <DropdownMenuItem key={m.company_id} onSelect={() => setActiveCompany(m.company_id)}>
-                <span className={cn('truncate', m.company_id === activeCompany?.id && 'font-semibold text-primary')}>{m.companies.name}</span>
+            <DropdownMenuLabel>{t('persona.switch')}</DropdownMenuLabel>
+            {personas.map((p) => (
+              <DropdownMenuItem
+                key={p.key}
+                onSelect={() => {
+                  if (p.key === persona?.key) return;
+                  choosePersona(p.key);
+                  void queryClient.invalidateQueries();
+                  navigate(personaHome(p), { replace: true });
+                }}
+              >
+                <span className="min-w-0 flex-1">
+                  <span className={cn('block truncate', p.key === persona?.key && 'font-semibold text-primary')}>{t(`persona.kind.${p.kind}`)}</span>
+                  {manyCompanies && p.companyName && <span className="block truncate text-xs text-muted-foreground">{p.companyName}</span>}
+                </span>
+                {p.key === persona?.key && <Check className="size-4 text-primary" aria-label={t('persona.current')} />}
               </DropdownMenuItem>
             ))}
           </>
         )}
         <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={() => navigate('/security')}>{t('mfa.title')}</DropdownMenuItem>
         <DropdownMenuItem onSelect={() => navigate('/')}>{t('nav.website')}</DropdownMenuItem>
         <DropdownMenuItem
           destructive
@@ -154,7 +205,7 @@ export function AppShell({ nav, brandName, logoUrl, homeTo, topbarExtra, banner 
   };
 
   return (
-    <div className="flex min-h-dvh bg-background">
+    <div className="app-canvas flex min-h-dvh">
       {!topbarLayout && (
         <motion.aside
           initial={false}
@@ -163,7 +214,7 @@ export function AppShell({ nav, brandName, logoUrl, homeTo, topbarExtra, banner 
           className="sticky top-0 hidden h-dvh shrink-0 flex-col overflow-hidden border-r border-sidebar-foreground/10 bg-sidebar text-sidebar-foreground lg:flex"
           aria-label={t('nav.main')}
         >
-          <div className={cn('flex h-16 shrink-0 items-center px-4', collapsed && 'justify-center px-0')}>
+          <div className={cn('flex h-16 shrink-0 items-center border-b border-sidebar-foreground/10 px-4', collapsed && 'justify-center px-0')}>
             <Brand name={brandName} logoUrl={logoUrl} to={homeTo} collapsed={collapsed} />
           </div>
           <SideNav nav={nav} collapsed={collapsed} />
@@ -182,7 +233,7 @@ export function AppShell({ nav, brandName, logoUrl, homeTo, topbarExtra, banner 
       )}
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 border-b border-sidebar-foreground/10 bg-sidebar text-sidebar-foreground shadow-sm">
+        <header className="sticky top-0 z-30 border-b border-sidebar-foreground/10 bg-sidebar/95 text-sidebar-foreground shadow-[0_6px_20px_-14px_hsl(var(--foreground)/0.45)] backdrop-blur-xl">
           <div className="flex h-16 items-center gap-2 px-3 sm:px-5">
             <Dialog open={drawer} onOpenChange={setDrawer}>
               <DialogTrigger asChild>
@@ -230,9 +281,10 @@ export function AppShell({ nav, brandName, logoUrl, homeTo, topbarExtra, banner 
         </header>
 
         {banner}
-        <main id="main" className="page flex-1">
+        <main id="main" className="page flex-1 pb-28 lg:pb-[var(--page-pad)]">
           <PageTransition />
         </main>
+        <BottomNav nav={nav} onMore={() => setDrawer(true)} />
       </div>
     </div>
   );

@@ -12,6 +12,7 @@ import { DialogBody, DialogFooter } from '@/components/ui/dialog';
 import { Input, Select } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/primitives';
 import { DataTable, type Column } from '@/components/shared/DataTable';
+import { FilterBar } from '@/components/shared/FilterBar';
 import { SelectField, TextField, TextareaField } from '@/components/shared/Field';
 import { EmptyState, ErrorState, ListSkeleton, QueryState } from '@/components/shared/states';
 import { FormDialog, PageHeader, StatusBadge } from '@/components/shared/widgets';
@@ -78,13 +79,22 @@ export function CustomersPage() {
   return (
     <>
       <PageHeader title={t('customers.title')} description={t('customers.subtitle')} actions={<Button variant="outline" size="sm" onClick={exportCsv} disabled={!rows.length}><Download />{t('common.exportCsv')}</Button>} />
-      <div className="mb-4 flex flex-col gap-2 sm:flex-row">
-        <Input type="search" placeholder={t('customers.search')} aria-label={t('common.search')} value={search} onChange={(e) => setSearch(e.target.value)} className="sm:max-w-sm" />
-        <Select aria-label={t('crm.status')} value={status} onChange={(e) => setStatus(e.target.value)} className="sm:w-48">
-          <option value="">{t('crm.allStatuses')}</option>
-          {COMPANY_STATUSES.map((s) => <option key={s} value={s}>{t(`status.${s}`)}</option>)}
-        </Select>
-      </div>
+      <FilterBar
+        className="mb-4"
+        search={<Input type="search" placeholder={t('customers.search')} aria-label={t('common.search')} value={search} onChange={(e) => setSearch(e.target.value)} />}
+        activeCount={status ? 1 : 0}
+        onReset={() => setStatus('')}
+        filters={[{
+          label: t('crm.status'),
+          className: 'md:w-48',
+          control: (
+            <Select aria-label={t('crm.status')} value={status} onChange={(e) => setStatus(e.target.value)}>
+              <option value="">{t('crm.allStatuses')}</option>
+              {COMPANY_STATUSES.map((s) => <option key={s} value={s}>{t(`status.${s}`)}</option>)}
+            </Select>
+          ),
+        }]}
+      />
       <QueryState query={query} isEmpty={() => rows.length === 0} empty={<EmptyState icon={Building2} title={t('customers.empty')} description={t('customers.emptyBody')} />}>
         {() => <DataTable caption={t('customers.title')} columns={columns} rows={rows} rowKey={(c) => c.id} onRowClick={(c) => navigate(`/admin/customers/${c.id}`)} />}
       </QueryState>

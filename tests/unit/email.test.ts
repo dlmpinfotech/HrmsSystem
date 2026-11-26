@@ -38,7 +38,7 @@ describe('email providers', () => {
     const res = await sendEmail({ to: 'x@test.in', subject: 'Hi', text: 'Hello', html: '<p>Hello</p>' });
     expect(res).toEqual({ provider: 'smtp', id: '<abc@gmail.com>' });
     expect(createTransport).toHaveBeenCalledWith(expect.objectContaining({ host: 'smtp.gmail.com', port: 465, secure: true, auth: { user: 'a@gmail.com', pass: 'abcdefghijklmnop' } }));
-    expect(sendMail).toHaveBeenCalledWith(expect.objectContaining({ from: 'DLMP <a@gmail.com>', to: 'x@test.in', subject: 'Hi' }));
+    expect(sendMail).toHaveBeenCalledWith(expect.objectContaining({ from: '"DLMP" <a@gmail.com>', to: 'x@test.in', subject: 'Hi' }));
   });
 
   it('uses STARTTLS on port 587', async () => {

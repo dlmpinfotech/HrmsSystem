@@ -126,6 +126,8 @@ export const NOTIFICATION_KEYS = [
   'payment_confirmation',
   'support_ticket_update',
   'follow_up_reminder',
+  'hr_pending_digest',
+  'approval_escalation',
 ] as const;
 export type NotificationKey = (typeof NOTIFICATION_KEYS)[number];
 

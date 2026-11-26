@@ -1,13 +1,13 @@
 import { useMemo, useRef, useState } from 'react';
 import { DndContext, KeyboardSensor, PointerSensor, TouchSensor, useDraggable, useDroppable, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
-import { motion } from 'motion/react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { CalendarClock, Download, Filter, KanbanSquare, List, Plus, Search, Users, X } from 'lucide-react';
+import { CalendarClock, Download, KanbanSquare, List, Plus, Search, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input, Select } from '@/components/ui/input';
 import { Avatar, Tabs, TabsList, TabsTrigger } from '@/components/ui/primitives';
 import { DataTable, type Column } from '@/components/shared/DataTable';
+import { FilterBar } from '@/components/shared/FilterBar';
 import { TextareaField } from '@/components/shared/Field';
 import { EmptyState, QueryState } from '@/components/shared/states';
 import { ConfirmDialog, PageHeader, StatusBadge } from '@/components/shared/widgets';
@@ -86,7 +86,6 @@ export function LeadsPage() {
   const { data: staff } = useStaff();
   const [params, setParams] = useSearchParams();
   const [view, setView] = useState<'table' | 'board'>(() => (storage.get(VIEW_KEY) === 'board' ? 'board' : 'table'));
-  const [filtersOpen, setFiltersOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [lostTarget, setLostTarget] = useState<string | null>(null);
   const [lostReason, setLostReason] = useState('');
@@ -169,44 +168,51 @@ export function LeadsPage() {
         }
       />
 
-      <div className="mb-4 space-y-3">
-        <div className="flex gap-2">
-          <div className="relative flex-1">
+      <FilterBar
+        className="mb-4"
+        activeCount={activeFilters}
+        onReset={() => setParams(new URLSearchParams(), { replace: true })}
+        search={
+          <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
             <Input type="search" placeholder={t('crm.searchPlaceholder')} aria-label={t('common.search')} defaultValue={filters.search} className="pl-9" onChange={(e) => { const v = e.target.value; window.clearTimeout(searchTimer.current); searchTimer.current = window.setTimeout(() => setFilter('search', v), 300); }} />
           </div>
-          <Button variant="outline" onClick={() => setFiltersOpen((o) => !o)} aria-expanded={filtersOpen} aria-controls="lead-filters">
-            <Filter />{t('common.filters')}{activeFilters > 0 && <span className="rounded-full bg-primary px-1.5 text-xs text-primary-foreground">{activeFilters}</span>}
-          </Button>
-        </div>
-        {filtersOpen && (
-          <motion.div id="lead-filters" initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} className="grid gap-2 rounded-xl border bg-card p-3 sm:grid-cols-3 xl:grid-cols-6">
+        }
+        filters={[
+          { label: t('crm.status'), control: (
             <Select aria-label={t('crm.status')} value={filters.status} onChange={(e) => setFilter('status', e.target.value)}>
               <option value="">{t('crm.allStatuses')}</option>
               {LEAD_STATUSES.map((s) => <option key={s} value={s}>{t(`leadStatus.${s}`)}</option>)}
             </Select>
+          ) },
+          { label: t('crm.source'), control: (
             <Select aria-label={t('crm.source')} value={filters.source} onChange={(e) => setFilter('source', e.target.value)}>
               <option value="">{t('crm.allSources')}</option>
               {LEAD_SOURCES.map((s) => <option key={s} value={s}>{t(`source.${s}`)}</option>)}
             </Select>
+          ) },
+          { label: t('form.city'), control: (
             <Select aria-label={t('form.city')} value={filters.city} onChange={(e) => setFilter('city', e.target.value)}>
               <option value="">{t('crm.allCities')}</option>
               {CITIES.map((c) => <option key={c} value={c}>{t(`city.${c}`)}</option>)}
             </Select>
+          ) },
+          { label: t('crm.priority'), control: (
             <Select aria-label={t('crm.priority')} value={filters.priority} onChange={(e) => setFilter('priority', e.target.value)}>
               <option value="">{t('crm.allPriorities')}</option>
               {LEAD_PRIORITIES.map((p) => <option key={p} value={p}>{t(`priority.${p}`)}</option>)}
             </Select>
+          ) },
+          { label: t('crm.assignedTo'), control: (
             <Select aria-label={t('crm.assignedTo')} value={filters.assigned} onChange={(e) => setFilter('assigned', e.target.value)}>
               <option value="">{t('crm.anyone')}</option>
               <option value="me">{t('crm.assignedToMe')}</option>
               <option value="unassigned">{t('crm.unassigned')}</option>
               {can('leads.assign') && salesPeople(staff).map((s) => <option key={s.id} value={s.id}>{s.full_name || s.email}</option>)}
             </Select>
-            <Button variant="ghost" onClick={() => setParams(new URLSearchParams(), { replace: true })}><X />{t('common.clear')}</Button>
-          </motion.div>
-        )}
-      </div>
+          ) },
+        ]}
+      />
 
       <QueryState query={query} empty={<EmptyState icon={Users} title={t('crm.emptyTitle')} description={t('crm.emptyBody')} action={<Button onClick={() => setCreateOpen(true)}><Plus />{t('crm.newLead')}</Button>} />}>
         {(leads) =>

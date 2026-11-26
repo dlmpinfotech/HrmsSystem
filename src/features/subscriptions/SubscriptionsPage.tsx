@@ -13,6 +13,7 @@ import { DialogBody, DialogFooter } from '@/components/ui/dialog';
 import { Input, Select } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/primitives';
 import { DataTable, type Column } from '@/components/shared/DataTable';
+import { FilterBar } from '@/components/shared/FilterBar';
 import { CheckField, TextField, TextareaField } from '@/components/shared/Field';
 import { EmptyState, QueryState } from '@/components/shared/states';
 import { ConfirmDialog, FormDialog, PageHeader, StatCard, StatusBadge } from '@/components/shared/widgets';
@@ -182,13 +183,23 @@ export function SubscriptionsPage() {
           <TabsTrigger value="plans">{t('plans.title')}</TabsTrigger>
         </TabsList>
         <TabsContent value="subscriptions">
-          <div className="mb-3 flex flex-col gap-2 sm:flex-row">
-            <Input type="search" aria-label={t('common.search')} placeholder={t('customers.search')} value={search} onChange={(e) => setSearch(e.target.value)} className="sm:max-w-xs" />
-            <Select aria-label={t('crm.status')} value={status} onChange={(e) => setStatus(e.target.value)} className="sm:w-44">
-              <option value="">{t('crm.allStatuses')}</option>
-              {SUBSCRIPTION_STATUSES.map((s) => <option key={s} value={s}>{t(`status.${s}`)}</option>)}
-            </Select>
-            <Button variant="outline" className="sm:ml-auto" onClick={() => downloadCsv('subscriptions', rows, [
+          <FilterBar
+            className="mb-3"
+            search={<Input type="search" aria-label={t('common.search')} placeholder={t('customers.search')} value={search} onChange={(e) => setSearch(e.target.value)} />}
+            activeCount={status ? 1 : 0}
+            onReset={() => setStatus('')}
+            filters={[{
+              label: t('crm.status'),
+              control: (
+                <Select aria-label={t('crm.status')} value={status} onChange={(e) => setStatus(e.target.value)}>
+                  <option value="">{t('crm.allStatuses')}</option>
+                  {SUBSCRIPTION_STATUSES.map((s) => <option key={s} value={s}>{t(`status.${s}`)}</option>)}
+                </Select>
+              ),
+            }]}
+          />
+          <div className="mb-3 flex justify-end">
+            <Button variant="outline" size="sm" onClick={() => downloadCsv('subscriptions', rows, [
               { header: 'Company', value: (s) => s.companies?.name }, { header: 'Plan', value: (s) => s.plans?.name }, { header: 'Status', value: (s) => s.status },
               { header: 'Billing', value: (s) => s.billing_frequency }, { header: 'Amount', value: (s) => s.amount }, { header: 'Trial end', value: (s) => formatDate(s.trial_end) },
               { header: 'Period end', value: (s) => formatDate(s.current_period_end) }, { header: 'Cancel at period end', value: (s) => (s.cancel_at_period_end ? 'Yes' : 'No') },

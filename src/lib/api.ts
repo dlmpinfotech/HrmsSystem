@@ -52,8 +52,12 @@ export async function api<T = unknown>(path: string, { method = 'GET', body, aut
 }
 
 /** i18n key for an error thrown by `api()` or Supabase; falls back to a generic message. */
+/** Postgres / PostgREST codes meaning a table, column or function does not exist yet (a migration was not run). */
+export const SCHEMA_MISSING_CODES = ['PGRST200', 'PGRST202', 'PGRST205', '42P01', '42703', '42883'];
+
 export function errorKey(err: unknown): string {
   if (err instanceof ApiError) return `errors.${err.code}`;
+  if (SCHEMA_MISSING_CODES.includes((err as { code?: string } | null)?.code ?? '')) return 'errors.schema_outdated';
   if (err instanceof Error && err.message.startsWith('errors.')) return err.message;
   // Database rules raise short snake_case codes (e.g. "leave_overlap") — map them to errors.<code>.
   if (err instanceof Error && /^[a-z][a-z0-9_]{2,40}$/.test(err.message)) return `errors.${err.message}`;

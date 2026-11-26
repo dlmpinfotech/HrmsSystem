@@ -68,7 +68,8 @@ describe('HR forms', () => {
 
   it('validates the employee form', () => {
     expect(employeeSchema.safeParse(base).success).toBe(true);
-    const bad = employeeSchema.safeParse({ ...base, shift_end: '09:00' });
+    expect(employeeSchema.safeParse({ ...base, shift_start: '22:00', shift_end: '06:00' }).success).toBe(true); // overnight
+    const bad = employeeSchema.safeParse({ ...base, shift_end: '09:30' });
     expect(bad.error?.issues[0]).toMatchObject({ path: ['shift_end'], message: 'validation.shiftEnd' });
     const noEmail = employeeSchema.safeParse({ ...base, login_access: true });
     expect(noEmail.error?.issues[0]).toMatchObject({ path: ['email'], message: 'validation.emailForAccess' });

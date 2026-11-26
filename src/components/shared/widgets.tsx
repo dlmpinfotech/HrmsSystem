@@ -22,13 +22,13 @@ export function PageHeader({ title, description, actions }: { title: string; des
     document.title = branding?.display_name ? `${title} | ${branding.display_name}` : title;
   }, [title, branding?.display_name]);
   return (
-    <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+    <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }} className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
       <div className="min-w-0">
-        <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
-        {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
+        <h1 className="text-balance text-2xl font-extrabold tracking-tight sm:text-[1.75rem] sm:leading-tight">{title}</h1>
+        {description && <p className="mt-1.5 max-w-2xl text-pretty text-sm text-muted-foreground sm:text-[0.9375rem]">{description}</p>}
       </div>
-      {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
-    </div>
+      {actions && <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end [&>*]:min-w-[8.5rem] [&>*]:flex-1 sm:[&>*]:min-w-0 sm:[&>*]:flex-none">{actions}</div>}
+    </motion.div>
   );
 }
 
@@ -69,17 +69,18 @@ export function StatCard({ label, value, format, icon: Icon, hint, tone = 'prima
   const tones = { primary: 'bg-primary/10 text-primary', info: 'bg-brand-2/15 text-foreground', success: 'bg-success/10 text-success', warning: 'bg-warning/10 text-warning' };
   return (
     <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, delay: Math.min(index * 0.04, 0.4) }} whileHover={{ y: -3 }}>
-      <Card className="h-full p-4">
-        <div className="flex items-start justify-between gap-2">
+      <Card className="card-interactive relative h-full overflow-hidden p-4">
+        <span className={cn('pointer-events-none absolute -right-6 -top-6 size-20 rounded-full opacity-60 blur-2xl', tones[tone])} aria-hidden />
+        <div className="relative flex items-start justify-between gap-2">
           <p className="text-sm font-medium text-muted-foreground">{label}</p>
-          <span className={cn('inline-flex size-9 shrink-0 items-center justify-center rounded-lg', tones[tone])}>
+          <span className={cn('inline-flex size-9 shrink-0 items-center justify-center rounded-xl', tones[tone])}>
             <Icon className="size-[18px]" aria-hidden />
           </span>
         </div>
-        <p className="mt-2 text-2xl font-bold tracking-tight sm:text-3xl">
+        <p className="relative mt-2 font-display text-2xl font-extrabold tracking-tight sm:text-3xl">
           <AnimatedNumber value={value} format={format} />
         </p>
-        {hint && <p className="mt-1 text-xs text-muted-foreground">{hint}</p>}
+        {hint && <p className="relative mt-1 text-xs text-muted-foreground">{hint}</p>}
       </Card>
     </motion.div>
   );

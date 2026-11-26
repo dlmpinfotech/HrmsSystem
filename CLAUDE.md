@@ -11,6 +11,7 @@ Sales/CRM/subscription platform for an existing HRMS product. React + Vite SPA, 
 
 ## Rules that matter
 - **Security lives in the database.** Any new table: enable RLS, add policies, add a test in `tests/integration/security.test.ts`. Never rely on UI hiding.
+- Every new table with RLS also needs the restrictive `mfa_required` policy (see `0017_mfa.sql`); `tests/integration/mfa.test.ts` fails without it.
 - Service-role client (`netlify/lib/supabase.ts`) only after `authenticate()` + permission check. Never import `netlify/` from `src/`. Browser env vars must be `VITE_`-prefixed and non-secret.
 - Payments: never set `status = 'verified'` or invoice `paid` directly — use `verify_payment()`. Triggers enforce this.
 - Validation: put schemas in `shared/schemas.ts` (used by forms and functions); error messages are i18n keys (`validation.*`).

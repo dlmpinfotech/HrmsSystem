@@ -12,6 +12,10 @@ export interface EmailMessage {
   subject: string;
   text: string;
   html: string;
+  /** Display name shown to the recipient, e.g. "Muthu (via Ezofis)". The address stays EMAIL_FROM's. */
+  fromName?: string;
+  /** Where replies go (e.g. the person who sent the invitation). */
+  replyTo?: string;
 }
 
 export interface EmailResult {
@@ -53,6 +57,29 @@ function parseFrom(from: string): { name?: string; email: string } {
   return m ? { name: m[1].trim() || undefined, email: m[2].trim() } : { email: from.trim() };
 }
 
+/** Display names cannot carry quotes, angle brackets or line breaks (header injection). */
+export function cleanDisplayName(name: string | null | undefined): string | undefined {
+  const v = (name ?? '').replace(/[\r\n"<>\\]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80);
+  return v || undefined;
+}
+
+/** "Muthu (via Ezofis)" — or just the company when the sender has no name. */
+export function viaName(person: string | null | undefined, company: string | null | undefined): string | undefined {
+  const p = cleanDisplayName(person);
+  const c = cleanDisplayName(company);
+  if (p && c) return `${p} (via ${c})`;
+  return p ?? c;
+}
+
+/** EMAIL_FROM's address with an optional per-message display name. */
+export function senderFor(message: Pick<EmailMessage, 'fromName'>, from = process.env.EMAIL_FROM ?? ''): { name?: string; email: string; header: string } {
+  const base = parseFrom(from);
+  const name = cleanDisplayName(message.fromName) ?? base.name;
+  return { name, email: base.email, header: name ? `"${name}" <${base.email}>` : base.email };
+}
+
+const cleanReplyTo = (v: string | undefined) => (v && /^[^\s@<>"]+@[^\s@<>"]+\.[^\s@<>"]+$/.test(v) ? v : undefined);
+
 async function post(url: string, headers: Record<string, string>, body: unknown): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 8000);
@@ -70,22 +97,25 @@ async function post(url: string, headers: Record<string, string>, body: unknown)
 
 export async function sendEmail(message: EmailMessage): Promise<EmailResult> {
   if (!emailConfigured()) throw new Error('email_not_configured');
-  const from = process.env.EMAIL_FROM as string;
   const provider = emailProvider();
+  const s = senderFor(message);
+  const from = s.header;
+  const sender = { name: s.name, email: s.email };
+  const replyTo = cleanReplyTo(message.replyTo);
 
   if (provider === 'smtp') {
-    const info = await smtpTransport().sendMail({ from, to: message.to, subject: message.subject, text: message.text, html: message.html });
+    const info = await smtpTransport().sendMail({ from, to: message.to, replyTo, subject: message.subject, text: message.text, html: message.html });
     return { provider: 'smtp', id: info.messageId ?? null };
   }
 
   const apiKey = process.env.EMAIL_API_KEY as string;
-  const sender = parseFrom(from);
 
   let res: Response;
   if (provider === 'resend') {
     res = await post('https://api.resend.com/emails', { Authorization: `Bearer ${apiKey}` }, {
       from,
       to: [message.to],
+      ...(replyTo ? { reply_to: replyTo } : {}),
       subject: message.subject,
       text: message.text,
       html: message.html,
@@ -94,6 +124,7 @@ export async function sendEmail(message: EmailMessage): Promise<EmailResult> {
     res = await post('https://api.sendgrid.com/v3/mail/send', { Authorization: `Bearer ${apiKey}` }, {
       personalizations: [{ to: [{ email: message.to }] }],
       from: sender,
+      ...(replyTo ? { reply_to: { email: replyTo } } : {}),
       subject: message.subject,
       content: [
         { type: 'text/plain', value: message.text },
@@ -104,6 +135,7 @@ export async function sendEmail(message: EmailMessage): Promise<EmailResult> {
     res = await post('https://api.brevo.com/v3/smtp/email', { 'api-key': apiKey }, {
       sender,
       to: [{ email: message.to }],
+      ...(replyTo ? { replyTo: { email: replyTo } } : {}),
       subject: message.subject,
       textContent: message.text,
       htmlContent: message.html,

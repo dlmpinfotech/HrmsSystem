@@ -44,7 +44,8 @@ export function check() {
   const en = flatten(JSON.parse(readFileSync(path.join(localesDir, 'en.json'), 'utf8')));
   const problems = [];
   const enKeys = new Set(en.keys());
-  const hasPrefix = (k) => enKeys.has(k) || [...enKeys].some((e) => e.startsWith(`${k}.`));
+  // A plural key is stored as k_one + k_other and used as t('k', { count }).
+  const hasPrefix = (k) => enKeys.has(k) || (enKeys.has(`${k}_one`) && enKeys.has(`${k}_other`)) || [...enKeys].some((e) => e.startsWith(`${k}.`));
   for (const k of usedKeys(path.join(root, 'src'))) if (!hasPrefix(k)) problems.push(`missing in en.json: ${k}`);
   for (const file of readdirSync(localesDir).filter((f) => f.endsWith('.json') && f !== 'en.json')) {
     const other = flatten(JSON.parse(readFileSync(path.join(localesDir, file), 'utf8')));

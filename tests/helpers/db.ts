@@ -24,8 +24,17 @@ create table auth.users (
 create or replace function auth.uid() returns uuid language sql stable as $$
   select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid
 $$;
+create or replace function auth.jwt() returns jsonb language sql stable as $$
+  select jsonb_build_object('aal', nullif(current_setting('request.jwt.claim.aal', true), ''))
+$$;
+create table auth.mfa_factors (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  status text not null default 'unverified'
+);
 grant usage on schema auth to anon, authenticated, service_role;
 grant execute on function auth.uid() to anon, authenticated, service_role;
+grant execute on function auth.jwt() to anon, authenticated, service_role;
 
 create schema storage;
 create table storage.buckets (

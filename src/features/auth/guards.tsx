@@ -17,6 +17,8 @@ export function RequireArea({ children, area }: GuardProps) {
 
   if (auth.loading) return <FullPageLoader />;
   if (!auth.session) return <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />;
+  if (auth.mfaPending) return <Navigate to="/mfa" replace state={{ from: location.pathname + location.search }} />;
+  if (auth.homePath === '/choose-account') return <Navigate to="/choose-account" replace />;
   if (area === 'staff' && !auth.isStaff) return <Navigate to={auth.homePath} replace />;
   if (area === 'customer' && !auth.activeCompany) return <Navigate to={auth.homePath} replace />;
   return <>{children}</>;

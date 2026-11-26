@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Language } from '../../shared/constants';
 import { formatIst } from '../../shared/slots';
 import { demoVars, type BookingRow } from './demos';
+import { runHrReminders } from './hrReminders';
 import { hasWhatsAppConsent, notify, retryDueNotifications } from './notifications';
 
 const HOUR = 3_600_000;
@@ -23,7 +24,7 @@ async function primaryContact(db: SupabaseClient, companyId: string) {
  */
 export async function runScheduledJobs(db: SupabaseClient, site: string) {
   const now = Date.now();
-  const summary = { lifecycle: null as unknown, demo_reminders: 0, trial_reminders: 0, renewal_reminders: 0, task_reminders: 0, retried: 0 };
+  const summary = { lifecycle: null as unknown, demo_reminders: 0, trial_reminders: 0, renewal_reminders: 0, task_reminders: 0, hr: null as unknown, retried: 0 };
 
   // 1. Subscription lifecycle (trial expiry, past-due, cancellations).
   const { data: lifecycle, error: lifecycleError } = await db.rpc('expire_subscriptions');
@@ -161,7 +162,14 @@ export async function runScheduledJobs(db: SupabaseClient, site: string) {
     summary.task_reminders++;
   }
 
-  // 6. Retry failed notifications whose backoff has elapsed.
+  // 6. HR approvals: daily digest after 24 h, escalation to Company Admins after 72 h.
+  try {
+    summary.hr = await runHrReminders(db, site, now);
+  } catch (err) {
+    console.error('[jobs] hr reminders', (err as Error).message);
+  }
+
+  // 7. Retry failed notifications whose backoff has elapsed.
   summary.retried = await retryDueNotifications(db);
   return summary;
 }

@@ -21,6 +21,26 @@ export function LogoMark({ className }: { className?: string }) {
   );
 }
 
+/** The logo mark drawing itself in: box pops, the "H" strokes draw, the accent dot pulses. */
+export function AnimatedLogoMark({ className, loop = false }: { className?: string; loop?: boolean }) {
+  return (
+    <motion.svg viewBox="0 0 32 32" className={cn('size-14', className)} aria-hidden initial={{ scale: 0.7, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}>
+      <rect width="32" height="32" rx="9" fill="hsl(var(--primary))" />
+      <motion.path
+        d="M9 22V10m0 6h14m0-6v12"
+        stroke="hsl(var(--primary-foreground))"
+        strokeWidth="3"
+        strokeLinecap="round"
+        fill="none"
+        initial={{ pathLength: 0 }}
+        animate={{ pathLength: 1 }}
+        transition={{ duration: 1, delay: 0.2, ease: [0.65, 0, 0.35, 1], repeat: loop ? Infinity : 0, repeatType: 'reverse', repeatDelay: 0.6 }}
+      />
+      <motion.circle cx="23" cy="10" r="2.6" fill="hsl(var(--brand-accent))" initial={{ scale: 0 }} animate={{ scale: [0, 1.35, 1] }} transition={{ duration: 0.6, delay: 0.9 }} style={{ transformOrigin: '23px 10px' }} />
+    </motion.svg>
+  );
+}
+
 export function Logo({ to = '/', name, logoUrl, className, textClassName }: { to?: string; name?: string; logoUrl?: string | null; className?: string; textClassName?: string }) {
   const config = usePublicConfig();
   const label = name ?? config.brand.name;

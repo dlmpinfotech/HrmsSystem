@@ -12,6 +12,7 @@ import { Switch, Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/u
 import { DataTable, type Column } from '@/components/shared/DataTable';
 import { CheckField, SelectField, TextField, TextareaField } from '@/components/shared/Field';
 import { EmptyState, QueryState } from '@/components/shared/states';
+import { FilterBar } from '@/components/shared/FilterBar';
 import { FormDialog, PageHeader, StatusBadge } from '@/components/shared/widgets';
 import { useAuth } from '@/features/auth/AuthProvider';
 import { salesPeople, staffName, useStaff } from '@/hooks/useStaff';
@@ -242,15 +243,25 @@ export function DemosPage() {
       <Tabs defaultValue="bookings">
         <TabsList><TabsTrigger value="bookings"><CalendarDays />{t('demos.bookings')}</TabsTrigger><TabsTrigger value="availability"><Clock />{t('demos.availability')}</TabsTrigger></TabsList>
         <TabsContent value="bookings">
-          <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center">
-            <Select aria-label={t('demos.scope')} value={scope} onChange={(e) => setScope(e.target.value as Scope)} className="sm:w-44">
-              <option value="upcoming">{t('demos.upcoming')}</option>
-              <option value="past">{t('demos.past')}</option>
-              <option value="all">{t('demos.all')}</option>
-            </Select>
-            <Input type="search" placeholder={t('common.search')} aria-label={t('common.search')} value={search} onChange={(e) => setSearch(e.target.value)} className="sm:max-w-xs" />
-            <label className="flex items-center gap-2 text-sm sm:ml-auto"><Switch checked={mine} onCheckedChange={setMine} />{t('demos.onlyMine')}</label>
-          </div>
+          <FilterBar
+            className="mb-4"
+            search={<Input type="search" placeholder={t('common.search')} aria-label={t('common.search')} value={search} onChange={(e) => setSearch(e.target.value)} />}
+            activeCount={(scope !== 'upcoming' ? 1 : 0) + (mine ? 1 : 0)}
+            onReset={() => { setScope('upcoming'); setMine(false); }}
+            filters={[
+              {
+                label: t('demos.scope'),
+                control: (
+                  <Select aria-label={t('demos.scope')} value={scope} onChange={(e) => setScope(e.target.value as Scope)}>
+                    <option value="upcoming">{t('demos.upcoming')}</option>
+                    <option value="past">{t('demos.past')}</option>
+                    <option value="all">{t('demos.all')}</option>
+                  </Select>
+                ),
+              },
+              { label: t('demos.onlyMine'), className: 'md:w-auto', control: <label className="flex min-h-11 items-center gap-2 text-sm"><Switch checked={mine} onCheckedChange={setMine} />{t('demos.onlyMine')}</label> },
+            ]}
+          />
           <QueryState query={query} isEmpty={() => filtered.length === 0} empty={<EmptyState icon={CalendarDays} title={t('demos.empty')} description={t('demos.emptyBody')} />}>
             {() =>
               scope === 'upcoming' ? (

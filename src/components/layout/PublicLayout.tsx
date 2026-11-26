@@ -6,7 +6,7 @@ import { Mail, MapPin, Menu, Phone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { FloatingWhatsApp, Logo, WhatsAppButton } from '@/components/shared/brand';
-import { ListSkeleton } from '@/components/shared/states';
+import { PageSkeleton } from '@/components/shared/states';
 import { LanguageSwitcher, ThemeToggle } from '@/components/shared/widgets';
 import { useAuth } from '@/features/auth/AuthProvider';
 import { usePublicConfig } from '@/hooks/usePublicConfig';
@@ -186,8 +186,8 @@ function CookieConsent({ measurementId }: { measurementId: string }) {
 export function PageTransition() {
   const location = useLocation();
   return (
-    <motion.div key={location.pathname} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2, ease: 'easeOut' }}>
-      <Suspense fallback={<ListSkeleton rows={6} className="py-6" />}>
+    <motion.div key={location.pathname} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}>
+      <Suspense fallback={<PageSkeleton />}>
         <Outlet />
       </Suspense>
     </motion.div>
