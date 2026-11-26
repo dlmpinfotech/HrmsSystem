@@ -12,6 +12,7 @@ import { WhatsAppButton } from '@/components/shared/brand';
 import { EmptyState, FullPageLoader, QueryState } from '@/components/shared/states';
 import { PageHeader, StatusBadge } from '@/components/shared/widgets';
 import { AppShell, type NavItem } from '@/components/layout/AppShell';
+import { hrmsTarget } from '@shared/hrmsLink';
 import { useAuth } from '@/features/auth/AuthProvider';
 import { useApplyCompanyBranding } from '@/features/branding/useBranding';
 import { VideoGallery } from '@/features/content/VideoGallery';
@@ -120,17 +121,16 @@ export function PortalLayout() {
 
 export function PortalDashboardPage() {
   const { t } = useTranslation();
-  const { activeCompany, isCompanyAdmin } = useAuth();
-  const config = usePublicConfig();
+  const { activeCompany, isCompanyAdmin, isHr } = useAuth();
   const { branding } = useTheme();
   const sub = useCompanySubscription(activeCompany!.id);
   const tickets = useQuery({
     queryKey: ['tickets-open-count', activeCompany!.id],
     queryFn: async () => (await sb().from('support_tickets').select('id', { count: 'exact', head: true }).eq('company_id', activeCompany!.id).not('status', 'in', '(resolved,closed)')).count ?? 0,
   });
-  const hrmsUrl = activeCompany?.hrms_url || config.brand.hrms_login_url;
+  const hrms = hrmsTarget(activeCompany?.hrms_url, isHr);
   const current = sub.data?.current;
-  const canOpenHrms = Boolean(hrmsUrl) && activeCompany?.status !== 'suspended' && activeCompany?.status !== 'cancelled';
+  const canOpenHrms = activeCompany?.status !== 'suspended' && activeCompany?.status !== 'cancelled';
   const quick = [
     { to: '/portal/company', icon: Building2, label: t('portal.nav.company') },
     ...(isCompanyAdmin ? [{ to: '/portal/branding', icon: Palette, label: t('portal.nav.branding') }] : []),
@@ -144,10 +144,12 @@ export function PortalDashboardPage() {
         title={t('portal.welcome', { company: branding?.display_name ?? activeCompany!.name })}
         description={branding?.tagline || t('portal.subtitle')}
         actions={
-          canOpenHrms ? (
-            <Button asChild size="lg"><a href={hrmsUrl} target="_blank" rel="noopener noreferrer"><ExternalLink />{t('portal.openHrms')}</a></Button>
+          !canOpenHrms ? (
+            <Button size="lg" disabled><LayoutDashboard />{t('portal.openHrms')}</Button>
+          ) : hrms.external ? (
+            <Button asChild size="lg"><a href={hrms.href} target="_blank" rel="noopener noreferrer"><ExternalLink />{t('portal.openHrms')}</a></Button>
           ) : (
-            <Button size="lg" disabled title={t('portal.hrmsPending')}><ExternalLink />{t('portal.openHrms')}</Button>
+            <Button asChild size="lg"><Link to={hrms.href}><LayoutDashboard />{t('portal.openHrms')}</Link></Button>
           )
         }
       />
@@ -166,7 +168,6 @@ export function PortalDashboardPage() {
           </motion.div>
         ))}
       </div>
-      {!hrmsUrl && <p className="mt-3 text-sm text-muted-foreground">{t('portal.hrmsPending')}</p>}
       <div className="mt-5 grid gap-5 xl:grid-cols-[1fr_360px]">
         <Card>
           <CardHeader><CardTitle>{t('onboarding.title')}</CardTitle></CardHeader>

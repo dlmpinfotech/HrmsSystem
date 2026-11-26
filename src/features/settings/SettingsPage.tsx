@@ -87,7 +87,6 @@ function GeneralSettings() {
             <TextField label={t('settings.supportEmail')} type="email" {...field('brand', 'support_email')} />
             <TextField label={t('settings.supportPhone')} type="tel" {...field('brand', 'support_phone')} />
             <TextField label={t('settings.address')} {...field('brand', 'address')} />
-            <TextField label={t('settings.hrmsLoginUrl')} type="url" placeholder="https://" hint={t('settings.hrmsLoginUrlHint')} {...field('brand', 'hrms_login_url')} />
           </CardContent>
         </Card>
         <Card>
